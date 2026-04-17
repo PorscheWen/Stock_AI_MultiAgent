@@ -1,0 +1,37 @@
+name: 每日收盤選股分析
+
+on:
+  schedule:
+    # 台灣時間 13:35 (UTC+8) = UTC 05:35，週一至週五
+    - cron: "35 5 * * 1-5"
+  workflow_dispatch: # 允許手動觸發
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run analysis
+        env:
+          ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID:             ${{ secrets.LINE_USER_ID }}
+          NOTION_API_KEY:           ${{ secrets.NOTION_API_KEY }}
+          NOTION_DB_ID:             ${{ secrets.NOTION_DB_ID }}
+          NOTIFY_EMAIL:             ${{ secrets.NOTIFY_EMAIL }}
+          SMTP_USER:                ${{ secrets.SMTP_USER }}
+          SMTP_PASS:                ${{ secrets.SMTP_PASS }}
+        run: python main.py
