@@ -21,8 +21,19 @@ import json
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
-LINE_USER_ID              = os.getenv("LINE_USER_ID", "")
+
+def _get_api() -> "MessagingApi":
+    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
+    if not token:
+        raise RuntimeError("LINE_CHANNEL_ACCESS_TOKEN 未設定")
+    return MessagingApi(ApiClient(Configuration(access_token=token)))
+
+
+def _get_user_id() -> str:
+    uid = os.environ.get("LINE_USER_ID", "")
+    if not uid:
+        raise RuntimeError("LINE_USER_ID 未設定")
+    return uid
 
 
 def _risk_color(level: int) -> str:
@@ -281,25 +292,26 @@ def _build_summary_bubble(report: dict) -> dict:
     }
 
 
+def push_text(message: str) -> None:
+    """推播純文字訊息（用於錯誤通知）。"""
+    _get_api().push_message(
+        PushMessageRequest(
+            to=_get_user_id(),
+            messages=[TextMessage(text=message)],
+        )
+    )
+
+
 def push_report(report: dict) -> bool:
     """推播選股報告至 LINE Bot"""
-    if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_USER_ID:
-        logger.warning("[LINE] 未設定 TOKEN 或 USER_ID，跳過推播")
+    try:
+        api     = _get_api()
+        user_id = _get_user_id()
+    except RuntimeError as e:
+        logger.warning("[LINE] %s，跳過推播", e)
         return False
 
     try:
-        from linebot.v3.messaging import (
-            Configuration, ApiClient, MessagingApi,
-            PushMessageRequest, FlexMessage,
-        )
-    except ImportError:
-        logger.error("[LINE] 請安裝 linebot v3: pip install line-bot-sdk")
-        return False
-
-    try:
-        config = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
-
-        # 依信心分數由高到低排序 → Carousel 由左而右為強力推薦優先
         sorted_stocks = sorted(
             report["stocks"],
             key=lambda x: x["scores"]["validation_confidence"],
@@ -310,31 +322,23 @@ def push_report(report: dict) -> bool:
         for rank, s in enumerate(sorted_stocks, 1):
             bubbles.append(_build_stock_bubble(s, rank))
 
-        # LINE Carousel 最多 12 個 bubble
-        bubbles = bubbles[:12]
+        carousel = {"type": "carousel", "contents": bubbles[:12]}
 
-        carousel = {
-            "type": "carousel",
-            "contents": bubbles,
-        }
-
-        with ApiClient(config) as api_client:
-            api = MessagingApi(api_client)
-            api.push_message(
-                PushMessageRequest(
-                    to=LINE_USER_ID,
-                    messages=[
-                        FlexMessage(
-                            alt_text=f"📊 今日選股報告 — {report['total_candidates']} 檔通過驗證",
-                            contents=FlexContainer.from_dict(carousel),
-                        )
-                    ],
-                )
+        api.push_message(
+            PushMessageRequest(
+                to=user_id,
+                messages=[
+                    FlexMessage(
+                        alt_text=f"📊 今日選股報告 — {report['total_candidates']} 檔通過驗證",
+                        contents=FlexContainer.from_dict(carousel),
+                    )
+                ],
             )
+        )
 
-        logger.info(f"[LINE] 推播成功：{report['total_candidates']} 檔選股報告")
+        logger.info("[LINE] 推播成功：%d 檔選股報告", report["total_candidates"])
         return True
 
     except Exception as e:
-        logger.error(f"[LINE] 推播失敗: {e}")
+        logger.error("[LINE] 推播失敗: %s", e)
         return False
