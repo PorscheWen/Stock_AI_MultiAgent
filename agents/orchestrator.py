@@ -25,6 +25,7 @@ from config.settings import (
     ANTHROPIC_API_KEY,
     CLAUDE_MODEL,
     REPORT_DIR,
+    STOCK_NAMES,
 )
 
 logging.basicConfig(
@@ -192,8 +193,10 @@ class OrchestratorAgent:
     def _build_report(self, passed: list[tuple], start_ts: datetime) -> dict:
         stocks = []
         for c, v in passed:
+            sym = c["symbol"]
             stocks.append({
-                "symbol":           c["symbol"],
+                "symbol":           sym,
+                "name":             STOCK_NAMES.get(sym, sym),
                 "close":            c["close"],
                 "scores": {
                     "technical":    round(c["technical_score"], 1),
@@ -213,6 +216,7 @@ class OrchestratorAgent:
                     "risk_reward_ratio": c["risk_reward_ratio"],
                 },
                 "best_entry_time":  c["best_entry_time"],
+                "operation":        v.final_verdict,
                 "validation": {
                     "passed":       v.passed,
                     "check1_signal": v.check1_signal_consistent,

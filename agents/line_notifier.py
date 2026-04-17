@@ -81,12 +81,25 @@ def _build_stock_bubble(s: dict, rank: int = 0) -> dict:
                     "layout": "horizontal",
                     "contents": [
                         {
-                            "type": "text",
-                            "text": f"{rank_prefix}{s['symbol']}",
-                            "size": "xl",
-                            "weight": "bold",
-                            "color": "#FFFFFF",
+                            "type": "box",
+                            "layout": "vertical",
                             "flex": 1,
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": f"{rank_prefix}{s['symbol']}",
+                                    "size": "xl",
+                                    "weight": "bold",
+                                    "color": "#FFFFFF",
+                                },
+                                {
+                                    "type": "text",
+                                    "text": s.get("name", s["symbol"]),
+                                    "size": "sm",
+                                    "color": "#FFFFFFcc",
+                                    "margin": "xs",
+                                },
+                            ],
                         },
                         {
                             "type": "text",
@@ -185,12 +198,29 @@ def _build_stock_bubble(s: dict, rank: int = 0) -> dict:
                 {"type": "separator", "margin": "sm"},
                 # 操作建議
                 {
-                    "type": "text",
-                    "text": f"💡 {s.get('best_entry_time', '')}",
-                    "size": "xs",
-                    "color": "#2C3E50",
-                    "wrap": True,
+                    "type": "box",
+                    "layout": "vertical",
                     "margin": "sm",
+                    "backgroundColor": "#E8F5E9",
+                    "paddingAll": "10px",
+                    "cornerRadius": "8px",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "📋 操作建議",
+                            "size": "xs",
+                            "weight": "bold",
+                            "color": "#2E7D32",
+                        },
+                        {
+                            "type": "text",
+                            "text": s.get("operation") or s.get("best_entry_time", ""),
+                            "size": "xs",
+                            "color": "#333333",
+                            "wrap": True,
+                            "margin": "xs",
+                        },
+                    ],
                 },
             ],
         },

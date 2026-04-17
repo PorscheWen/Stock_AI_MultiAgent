@@ -12,12 +12,32 @@ CLAUDE_MODEL = "claude-opus-4-6"          # 主力模型
 CLAUDE_HAIKU  = "claude-haiku-4-5-20251001"  # 快速推論用
 
 # ── 掃描目標股票池 ─────────────────────────────────────
-# 可換成台股清單，格式：{"2330.TW", "2317.TW", ...}
 WATCHLIST = [
     "AAPL", "MSFT", "NVDA", "TSLA", "META",
     "GOOGL", "AMZN", "AMD", "SOFI", "PLTR",
     "2330.TW", "2317.TW", "2454.TW", "2382.TW", "3008.TW",
 ]
+
+# ── 股票名稱對照表 ──────────────────────────────────────
+STOCK_NAMES: dict[str, str] = {
+    # 美股
+    "AAPL":  "Apple",
+    "MSFT":  "Microsoft",
+    "NVDA":  "NVIDIA",
+    "TSLA":  "Tesla",
+    "META":  "Meta",
+    "GOOGL": "Alphabet",
+    "AMZN":  "Amazon",
+    "AMD":   "AMD",
+    "SOFI":  "SoFi",
+    "PLTR":  "Palantir",
+    # 台股
+    "2330.TW": "台積電",
+    "2317.TW": "鴻海",
+    "2454.TW": "聯發科",
+    "2382.TW": "廣達",
+    "3008.TW": "大立光",
+}
 
 # ── 技術面門檻 ─────────────────────────────────────────
 VOLUME_SURGE_MULTIPLIER = 2.5   # 成交量異常倍數
