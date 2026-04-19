@@ -1,6 +1,6 @@
-# 短期爆發股票 協同 Agent 系統
+# Stock_AI_MultiAgent
 
-Multi-Agent 架構，每日台股收盤後（13:35）透過 GitHub Actions 自動掃描台股 + 美股，經三重驗證後推播 LINE 操作建議。
+短期爆發股票協同 Agent 系統。Multi-Agent 架構，每日台股收盤後透過 GitHub Actions 自動掃描台股 + 美股，經三重驗證後推播 LINE 操作建議，並寫入 Notion 資料庫。
 
 ## 架構
 
@@ -36,27 +36,7 @@ ORCHESTRATOR（主控）
             ↓（並行）
     ValidationAgent（三重把關）
             ↓
-    最終 JSON 報告 + LINE Flex Message 推播
-```
-
-## 快速開始
-
-```bash
-# 1. 安裝依賴
-pip install -r requirements.txt
-
-# 2. 設定 API 金鑰
-cp .env.example .env
-# 編輯 .env 填入所需金鑰
-
-# 3. 立即執行一次
-python main.py
-
-# 4. 只輸出 JSON 報告
-python main.py --json
-
-# 5. 執行測試
-python -m pytest tests/ -v
+    最終 JSON 報告 + LINE Flex Message 推播 + Notion 寫入
 ```
 
 ## GitHub Actions 自動排程
@@ -82,6 +62,26 @@ python -m pytest tests/ -v
 | `NOTIFY_EMAIL` | Email 通知收件地址 |
 | `SMTP_USER` / `SMTP_PASS` | Gmail 應用程式密碼 |
 
+## 快速開始（本機執行）
+
+```bash
+# 1. 安裝依賴
+pip install -r requirements.txt
+
+# 2. 設定 API 金鑰
+cp .env.example .env
+# 編輯 .env 填入所需金鑰
+
+# 3. 立即執行一次
+python main.py
+
+# 4. 只輸出 JSON 報告
+python main.py --json
+
+# 5. 執行測試
+python -m pytest tests/ -v
+```
+
 ## 驗證門檻
 
 | 項目 | 門檻 |
@@ -91,3 +91,5 @@ python -m pytest tests/ -v
 | 風報比 | ≥ 2:1 |
 | 單檔資金上限 | ≤ 10% |
 | 回測最低勝率 | ≥ 50% |
+
+> ⚠️ 本專案資訊僅供參考，不構成任何投資建議。
