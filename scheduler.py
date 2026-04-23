@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from agents.orchestrator import OrchestratorAgent
+from agents.line_notifier import push_report, push_text
 from config.settings import NOTIFY_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
 
 logger = logging.getLogger("Scheduler")
@@ -75,6 +76,7 @@ def daily_job():
     agent  = OrchestratorAgent()
     report = agent.run()
     send_email(report)
+    push_report(report)
 
     # 印出摘要
     print("\n" + "=" * 60)
