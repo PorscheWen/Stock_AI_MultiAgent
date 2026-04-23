@@ -1,6 +1,6 @@
 # Stock_AI_MultiAgent
 
-短期爆發股票協同 Agent 系統。Multi-Agent 架構，每日台股收盤後透過 GitHub Actions 自動掃描台股 + 美股，經三重驗證後推播 LINE 操作建議，並寫入 Notion 資料庫。
+🤖 多智能體股票選股系統 | Multi-Agent 架構自動掃描台股+美股，三重驗證後推播 LINE 操作建議 | GitHub Actions 自動排程
 
 ## 架構
 
