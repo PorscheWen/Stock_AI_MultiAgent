@@ -16,12 +16,16 @@ load_dotenv()
 
 from linebot import LineBotApi
 from linebot.models import (
-    RichMenu, RichMenuSize, RichMenuArea, RichMenuBounds, MessageAction
+    RichMenu, RichMenuSize, RichMenuArea, RichMenuBounds,
+    MessageAction, URIAction
 )
 
 ACCESS_TOKEN = os.getenv("CHANNEL_STOCK_ACCESS_TOKEN", "")
 if not ACCESS_TOKEN:
     sys.exit("❌ 找不到 CHANNEL_STOCK_ACCESS_TOKEN，請確認 .env 設定")
+
+# PWA 網址（部署後填入，例：https://your-app.onrender.com/app）
+APP_URL = os.getenv("APP_URL", "https://your-app.onrender.com/app")
 
 api = LineBotApi(ACCESS_TOKEN)
 
@@ -31,28 +35,71 @@ ROWS, COLS = 2, 3
 CW, CH = W // COLS, H // ROWS
 
 # ── 選單項目 ─────────────────────────────────────────────────────────────────
-# (row, col, 英文主標, 中文副標, 觸發文字, 深色背景, 淺色背景)
+# (row, col, 英文標籤, action_type, action_value, 深色背景, 淺色背景, 圖示key)
 ITEMS = [
-    (0, 0, "PORTFOLIO",   "查看持股",   "查看持股",   "#0D47A1", "#1E88E5"),
-    (0, 1, "AI ANALYSIS", "分析持股",   "分析持股",   "#4A148C", "#8E24AA"),
-    (0, 2, "PRICE",       "即時股價",   "股價",       "#004D40", "#00897B"),
-    (1, 0, "SCREENSHOT",  "截圖匯入",   "截圖匯入",   "#BF360C", "#F4511E"),
-    (1, 1, "ADD STOCK",   "新增持股",   "新增持股",   "#1B5E20", "#43A047"),
-    (1, 2, "HELP",        "幫助指令",   "幫助",       "#212121", "#546E7A"),
+    (0, 0, "PORTFOLIO",  "msg", "查看持股", "#0D47A1", "#1E88E5", "PORTFOLIO"),
+    (0, 1, "AI ANALYSIS","msg", "分析持股", "#4A148C", "#8E24AA", "AI"),
+    (0, 2, "PRICE",      "msg", "股價",     "#004D40", "#00897B", "PRICE"),
+    (1, 0, "SCREENSHOT", "msg", "截圖匯入", "#BF360C", "#F4511E", "SCREENSHOT"),
+    (1, 1, "PWA APP",    "uri", APP_URL,    "#1A237E", "#3949AB", "WEBAPP"),
+    (1, 2, "HELP",       "msg", "幫助",     "#212121", "#546E7A", "HELP"),
 ]
 
 def hex_rgb(h):
     h = h.lstrip("#")
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-# ── 幾何圖示定義（比例座標，相對於格子） ─────────────────────────────────────
+# ── 圖示定義：所有 y 座標限制在 0.50 以內，避免遮住底部文字標籤 ─────────
+# 格式：("R",x1,y1,x2,y2) | ("C",cx,cy,r) | ("L",x1,y1,x2,y2)
 ICONS = {
-    "PORTFOLIO":   [("R",.20,.28,.80,.52), ("L",.20,.64,.80,.64), ("L",.20,.74,.60,.74)],
-    "AI ANALYSIS": [("C",.50,.35,.15),    ("L",.30,.60,.70,.60), ("L",.38,.72,.62,.72)],
-    "PRICE":       [("R",.22,.22,.78,.68),("L",.35,.42,.65,.42), ("L",.35,.54,.65,.54)],
-    "SCREENSHOT":  [("R",.18,.26,.82,.72),("C",.50,.49,.13)],
-    "ADD STOCK":   [("L",.50,.28,.50,.72),("L",.28,.50,.72,.50)],
-    "HELP":        [("C",.50,.33,.13),    ("L",.50,.52,.50,.64), ("C",.50,.74,.05)],
+    # 持股：長條圖（bar chart）
+    "PORTFOLIO": [
+        ("R", .18,.36,.34,.50),   # 短柱
+        ("R", .41,.24,.57,.50),   # 中柱
+        ("R", .64,.10,.80,.50),   # 高柱
+        ("L", .14,.50,.84,.50),   # X 軸
+    ],
+    # AI 分析：神經網絡節點
+    "AI": [
+        ("C", .50,.18,.10),        # 頂部節點
+        ("C", .26,.38,.08),        # 左節點
+        ("C", .74,.38,.08),        # 右節點
+        ("L", .50,.28,.26,.30),   # 連線左
+        ("L", .50,.28,.74,.30),   # 連線右
+        ("C", .50,.48,.08),        # 底部節點
+    ],
+    # 股價：折線圖
+    "PRICE": [
+        ("L", .13,.45,.30,.28),
+        ("L", .30,.28,.48,.38),
+        ("L", .48,.38,.66,.14),
+        ("L", .66,.14,.84,.25),
+        ("L", .10,.50,.88,.50),   # X 軸
+    ],
+    # 截圖：手機框
+    "SCREENSHOT": [
+        ("R", .30,.06,.70,.50),   # 手機外框
+        ("C", .50,.26,.10),        # 鏡頭
+        ("L", .42,.46,.58,.46),   # 主頁鍵
+    ],
+    # PWA：瀏覽器視窗
+    "WEBAPP": [
+        ("R", .12,.06,.88,.50),   # 外框
+        ("L", .12,.20,.88,.20),   # 標題欄分隔線
+        ("C", .24,.13,.05),        # 視窗按鈕1
+        ("C", .36,.13,.05),        # 視窗按鈕2
+        ("L", .46,.08,.82,.08),   # 地址列（上）
+        ("L", .46,.18,.82,.18),   # 地址列（下）
+        ("L", .20,.30,.80,.30),   # 內容線1
+        ("L", .20,.39,.80,.39),   # 內容線2
+        ("L", .20,.48,.68,.48),   # 內容線3
+    ],
+    # 幫助：問號
+    "HELP": [
+        ("C", .50,.16,.11),        # ? 頂部圓弧
+        ("L", .50,.27,.50,.41),   # ? 竪
+        ("C", .50,.48,.04),        # ? 點
+    ],
 }
 
 def generate_menu_image() -> bytes:
@@ -76,7 +123,7 @@ def generate_menu_image() -> bytes:
         bb = draw.textbbox((0,0), text, font=font)
         return bb[2]-bb[0], bb[3]-bb[1]
 
-    for row, col, en, zh, _, bg_dk, bg_lt in ITEMS:
+    for row, col, en, atype, aval, bg_dk, bg_lt, icon_key in ITEMS:
         x0, y0 = col*CW, row*CH
         x1, y1 = x0+CW-1, y0+CH-1
 
@@ -97,38 +144,32 @@ def generate_menu_image() -> bytes:
             c = tuple(int(min(255, v+80*alpha)) for v in hex_rgb(bg_lt))
             draw.line([(x0, y0+dy),(x1, y0+dy)], fill=c)
 
-        # 幾何圖示
+        # 幾何圖示（全部限制在格子上半部 y ≤ 0.52）
         IW = 12   # line width
-        for spec in ICONS.get(en, []):
+        ICON_SCALE = 0.82  # 圖示佔格子高度的比例（縮放至前 55% 空間）
+        for spec in ICONS.get(icon_key, []):
             t_ = spec[0]
             if t_ == "C":
-                cx=x0+spec[1]*CW; cy=y0+spec[2]*CH; r=spec[3]*CW
+                cx=x0+spec[1]*CW; cy=y0+spec[2]*CH*ICON_SCALE; r=spec[3]*CW
                 draw.ellipse([cx-r,cy-r,cx+r,cy+r], outline=(255,255,255,210), width=IW)
             elif t_ == "R":
-                draw.rectangle([x0+spec[1]*CW, y0+spec[2]*CH,
-                                 x0+spec[3]*CW, y0+spec[4]*CH],
+                draw.rectangle([x0+spec[1]*CW, y0+spec[2]*CH*ICON_SCALE,
+                                 x0+spec[3]*CW, y0+spec[4]*CH*ICON_SCALE],
                                 outline=(255,255,255,210), width=IW)
             elif t_ == "L":
-                draw.line([x0+spec[1]*CW, y0+spec[2]*CH,
-                           x0+spec[3]*CW, y0+spec[4]*CH],
+                draw.line([x0+spec[1]*CW, y0+spec[2]*CH*ICON_SCALE,
+                           x0+spec[3]*CW, y0+spec[4]*CH*ICON_SCALE],
                           fill=(255,255,255,210), width=IW)
 
-        # 英文主標
+        # 英文標籤（位於格子下方 65% 處）
         sz = 108
         f = fnt(sz)
         while tw(draw, en, f)[0] > CW*0.82 and sz > 44:
             sz -= 6; f = fnt(sz)
         w_,_ = tw(draw, en, f)
-        mx = x0+(CW-w_)//2;  my = y0+int(CH*0.60)
+        mx = x0+(CW-w_)//2;  my = y0+int(CH*0.65)
         draw.text((mx+3,my+3), en, font=f, fill=(0,0,0,120))
         draw.text((mx,my),     en, font=f, fill=(255,255,255))
-
-        # 中文副標（用 DejaVu 只顯示 ASCII 範圍字符——中文顯示為小方格，
-        #           但位置和中文字數合理，用來標示功能位置）
-        f2 = fnt(60, bold=False)
-        w2,_ = tw(draw, zh, f2)
-        hx = x0+(CW-w2)//2;  hy = my+int(CH*0.15)
-        draw.text((hx,hy), zh, font=f2, fill=(200,220,255))
 
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=92)
@@ -137,10 +178,14 @@ def generate_menu_image() -> bytes:
 
 def build_rich_menu():
     areas = []
-    for row, col, en, zh, action_text, _, __ in ITEMS:
+    for row, col, en, atype, aval, bg_dk, bg_lt, icon_key in ITEMS:
+        if atype == "uri":
+            action = URIAction(label=en[:20], uri=aval)
+        else:
+            action = MessageAction(label=en[:20], text=aval)
         areas.append(RichMenuArea(
             bounds=RichMenuBounds(x=col*CW, y=row*CH, width=CW, height=CH),
-            action=MessageAction(label=zh, text=action_text),
+            action=action,
         ))
     return RichMenu(
         size=RichMenuSize(width=W, height=H),
