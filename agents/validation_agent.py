@@ -12,7 +12,7 @@ from typing import Optional
 import anthropic
 
 from config.settings import (
-    ANTHROPIC_API_KEY,
+    ANTHROPIC_AUTH_TOKEN,
     CLAUDE_MODEL,
     CONFIDENCE_THRESHOLD,
     MAX_POSITION_PCT,
@@ -23,7 +23,7 @@ from config.settings import (
 
 logger = logging.getLogger(__name__)
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client = anthropic.Anthropic(api_key=ANTHROPIC_AUTH_TOKEN)
 
 
 @dataclass

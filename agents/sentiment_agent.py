@@ -16,11 +16,11 @@ import anthropic
 import requests
 from bs4 import BeautifulSoup
 
-from config.settings import ANTHROPIC_API_KEY, CLAUDE_HAIKU
+from config.settings import ANTHROPIC_AUTH_TOKEN, CLAUDE_HAIKU
 
 logger = logging.getLogger(__name__)
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client = anthropic.Anthropic(api_key=ANTHROPIC_AUTH_TOKEN)
 
 
 @dataclass

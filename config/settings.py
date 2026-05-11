@@ -8,6 +8,9 @@ load_dotenv()
 
 # ── Anthropic ──────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+CLAUDE_CODE_OAUTH_TOKEN = os.getenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+# 優先使用 OAuth Token，其次使用 API Key
+ANTHROPIC_AUTH_TOKEN = CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
 CLAUDE_MODEL = "claude-opus-4-6"          # 主力模型
 CLAUDE_HAIKU  = "claude-haiku-4-5-20251001"  # 快速推論用
 

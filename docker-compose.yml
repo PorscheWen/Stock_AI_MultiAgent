@@ -1,0 +1,32 @@
+# Docker Compose 配置
+
+version: '3.8'
+
+services:
+  stock-ai-app:
+    build: .
+    container_name: stock-ai-multiagent
+    ports:
+      - "5000:5000"
+    environment:
+      # LINE Bot 設定
+      - CHANNEL_STOCK_ACCESS_TOKEN=${CHANNEL_STOCK_ACCESS_TOKEN}
+      - CHANNEL_STOCK_SECRET=${CHANNEL_STOCK_SECRET}
+      - CHANNEL_STOCK_USER_ID=${CHANNEL_STOCK_USER_ID}
+      
+      # Claude AI
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      
+      # 選用
+      - NOTION_API_KEY=${NOTION_API_KEY:-}
+      - NOTION_DB_ID=${NOTION_DB_ID:-}
+    volumes:
+      - ./database/data:/app/database/data
+      - ./reports:/app/reports
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

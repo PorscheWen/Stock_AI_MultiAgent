@@ -1,0 +1,38 @@
+[
+    {
+        "symbol": "2330.TW",
+        "shares": 100,
+        "avg_price": 580,
+        "note": "台積電"
+    },
+    {
+        "symbol": "2317.TW",
+        "shares": 200,
+        "avg_price": 110,
+        "note": "鴻海"
+    },
+    {
+        "symbol": "2454.TW",
+        "shares": 50,
+        "avg_price": 920,
+        "note": "聯發科"
+    },
+    {
+        "symbol": "AAPL",
+        "shares": 30,
+        "avg_price": 185,
+        "note": "蘋果"
+    },
+    {
+        "symbol": "NVDA",
+        "shares": 20,
+        "avg_price": 495,
+        "note": "輝達"
+    },
+    {
+        "symbol": "MSFT",
+        "shares": 40,
+        "avg_price": 380,
+        "note": "微軟"
+    }
+]

@@ -8,11 +8,16 @@ import argparse
 import io
 import json
 import sys
+import logging
 
 # 強制 stdout 使用 UTF-8，解決 Windows cp950 emoji 編碼問題
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 from agents.orchestrator import OrchestratorAgent
+from agents.line_notifier import push_report, push_text
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 # ── 評分轉星級 ─────────────────────────────────────────
@@ -161,6 +166,7 @@ def print_report(report: dict):
 def main():
     parser = argparse.ArgumentParser(description="短期爆發股票 MultiAgent 系統")
     parser.add_argument("--json", action="store_true", help="只輸出 JSON 報告")
+    parser.add_argument("--no-line", action="store_true", help="不推播到 LINE")
     args = parser.parse_args()
 
     agent  = OrchestratorAgent()
@@ -170,6 +176,22 @@ def main():
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
         print_report(report)
+
+    # 推播到 LINE（除非使用 --no-line）
+    if not args.no_line:
+        try:
+            if report and report.get("stocks"):
+                logger.info(f"📲 推播報告到 LINE: {len(report['stocks'])} 檔股票")
+                success = push_report(report)
+                if success:
+                    logger.info("✅ LINE 推播成功")
+                else:
+                    logger.error("❌ LINE 推播失敗")
+            else:
+                logger.info("📊 今日無符合條件的股票，推播空報告訊息")
+                push_text("📊 今日分析完成\n\n無符合條件的股票\n請調整篩選條件或稍後再試")
+        except Exception as e:
+            logger.error(f"❌ LINE 推播發生錯誤: {e}", exc_info=True)
 
 
 if __name__ == "__main__":
