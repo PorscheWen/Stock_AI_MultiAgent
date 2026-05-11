@@ -14,6 +14,7 @@ import os
 from database.portfolio_db import PortfolioDB
 from agents.orchestrator import OrchestratorAgent
 from agents.screenshot_agent import ScreenshotAgent
+from agents.portfolio_view import format_portfolio_lines, parse_list_sort_args
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,10 @@ def get_help_message() -> str:
   例：新增持股 2330.TW
   例：新增持股 AAPL
 
-• 查看持股
-  顯示所有持股清單
+• 查看持股 [排序] [逆序]
+  顯示名稱、持有成本、參考損益、資料更新日
+  排序：代碼、股數、成本、獲利、獲利%、名稱、更新
+  例：查看持股 股數 逆序　查看持股 依獲利
 
 • 刪除持股 <代碼>
   例：刪除持股 2330.TW
@@ -111,11 +114,12 @@ def handle_message(event):
         if not portfolio:
             reply = "📭 您目前沒有持股\n使用「新增持股 <代碼>」來新增"
         else:
-            lines = ["📊 您的持股：\n"]
-            for i, stock in enumerate(portfolio, 1):
-                symbol = stock["symbol"]
-                lines.append(f"{i}. {symbol}")
-            reply = "\n".join(lines)
+            sort_key, reverse = parse_list_sort_args(args)
+            try:
+                reply = format_portfolio_lines(portfolio, sort_key, reverse)
+            except Exception as e:
+                logger.exception("查看持股格式化失敗")
+                reply = f"❌ 無法產生持股清單：{e}"
     
     # ── 刪除持股 ───────────────────────────────────────
     elif cmd == "刪除持股":

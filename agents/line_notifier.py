@@ -518,33 +518,34 @@ def _build_portfolio_summary_bubble(report: dict) -> dict:
 def _build_portfolio_stock_bubble(s: dict, rank: int = 0) -> dict:
     """持股操作建議 Bubble"""
     recommendation = s.get("recommendation", "HOLD")
+    rec_key = (recommendation or "").upper()
     rec_emoji = {
         "STRONG_BUY": "🚀",
         "BUY": "📈",
         "HOLD": "✋",
         "SELL": "📉",
-        "STRONG_SELL": "⚠️"
+        "STRONG_SELL": "⚠️",
     }
-    
+
     rec_color = {
         "STRONG_BUY": "#27AE60",
         "BUY": "#2ECC71",
         "HOLD": "#F39C12",
         "SELL": "#E67E22",
-        "STRONG_SELL": "#E74C3C"
+        "STRONG_SELL": "#E74C3C",
     }
-    
+
     rec_text = {
         "STRONG_BUY": "強力買進",
         "BUY": "買進",
         "HOLD": "持有",
         "SELL": "賣出",
-        "STRONG_SELL": "強力賣出"
+        "STRONG_SELL": "強力賣出",
     }
-    
-    emoji = rec_emoji.get(recommendation, "📊")
-    color = rec_color.get(recommendation, "#95A5A6")
-    rec_label = rec_text.get(recommendation, recommendation)
+
+    emoji = rec_emoji.get(rec_key, "📊")
+    color = rec_color.get(rec_key, "#95A5A6")
+    rec_label = rec_text.get(rec_key, recommendation)
     
     sc = s.get("scores", {})
     confidence = s.get("confidence", 0)
@@ -612,12 +613,13 @@ def _build_portfolio_stock_bubble(s: dict, rank: int = 0) -> dict:
             "spacing": "sm",
             "paddingAll": "16px",
             "contents": [
-                # 評分列
+                # 評分列（含籌碼面）
                 {
                     "type": "box",
                     "layout": "horizontal",
                     "contents": [
                         {"type": "text", "text": "技術", "size": "xs", "color": "#888888", "flex": 1},
+                        {"type": "text", "text": "籌碼", "size": "xs", "color": "#888888", "flex": 1},
                         {"type": "text", "text": "情緒", "size": "xs", "color": "#888888", "flex": 1},
                         {"type": "text", "text": "風控", "size": "xs", "color": "#888888", "flex": 1},
                         {"type": "text", "text": "回測", "size": "xs", "color": "#888888", "flex": 1},
@@ -628,6 +630,7 @@ def _build_portfolio_stock_bubble(s: dict, rank: int = 0) -> dict:
                     "layout": "horizontal",
                     "contents": [
                         {"type": "text", "text": f"{sc.get('technical', 0):.0f}", "size": "md", "weight": "bold", "flex": 1},
+                        {"type": "text", "text": f"{sc.get('chips', 0):.0f}", "size": "md", "weight": "bold", "flex": 1},
                         {"type": "text", "text": f"{sc.get('sentiment', 0):.0f}", "size": "md", "weight": "bold", "flex": 1},
                         {"type": "text", "text": f"{sc.get('risk', 0):.0f}", "size": "md", "weight": "bold", "flex": 1},
                         {"type": "text", "text": f"{sc.get('backtest', 0):.0f}", "size": "md", "weight": "bold", "flex": 1},
@@ -644,7 +647,7 @@ def _build_portfolio_stock_bubble(s: dict, rank: int = 0) -> dict:
                     "margin": "sm",
                 },
                 {"type": "separator", "margin": "sm"},
-                # 價格資訊
+                # 價格資訊（停損／停利）
                 {
                     "type": "box",
                     "layout": "horizontal",
@@ -664,7 +667,7 @@ def _build_portfolio_stock_bubble(s: dict, rank: int = 0) -> dict:
                             "layout": "vertical",
                             "flex": 1,
                             "contents": [
-                                {"type": "text", "text": "停損價", "size": "xs", "color": "#E74C3C"},
+                                {"type": "text", "text": "停損", "size": "xs", "color": "#E74C3C"},
                                 {"type": "text", "text": f"${s.get('stop_loss', 0):,.1f}", "size": "sm", "weight": "bold", "color": "#E74C3C"},
                             ],
                         },
@@ -673,11 +676,61 @@ def _build_portfolio_stock_bubble(s: dict, rank: int = 0) -> dict:
                             "layout": "vertical",
                             "flex": 1,
                             "contents": [
-                                {"type": "text", "text": "目標價", "size": "xs", "color": "#27AE60"},
-                                {"type": "text", "text": f"${s.get('target_price', 0):,.1f}", "size": "sm", "weight": "bold", "color": "#27AE60"},
+                                {"type": "text", "text": "停利(主)", "size": "xs", "color": "#27AE60"},
+                                {
+                                    "type": "text",
+                                    "text": f"${s.get('take_profit_price', s.get('target_price', 0)):,.1f}",
+                                    "size": "sm",
+                                    "weight": "bold",
+                                    "color": "#27AE60",
+                                },
                             ],
                         },
                     ],
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "margin": "xs",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "contents": [
+                                {"type": "text", "text": "分批停利", "size": "xs", "color": "#888888"},
+                                {
+                                    "type": "text",
+                                    "text": f"${s.get('take_profit_partial', 0):,.1f}",
+                                    "size": "xs",
+                                    "color": "#333333",
+                                },
+                            ],
+                        },
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 2,
+                            "contents": [
+                                {"type": "text", "text": "持有建議", "size": "xs", "color": "#888888"},
+                                {
+                                    "type": "text",
+                                    "text": s.get("horizon_label_zh", "—"),
+                                    "size": "xs",
+                                    "color": "#333333",
+                                    "wrap": True,
+                                },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    "type": "text",
+                    "text": s.get("horizon_rationale", ""),
+                    "size": "xs",
+                    "color": "#666666",
+                    "wrap": True,
+                    "margin": "xs",
                 },
                 {"type": "separator", "margin": "sm"},
                 # 進場策略

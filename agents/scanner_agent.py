@@ -45,8 +45,9 @@ class ScanResult:
 class ScannerAgent:
     """技術面掃描 Agent"""
 
-    def __init__(self, watchlist: list[str] = None):
+    def __init__(self, watchlist: list[str] = None, min_technical_score: float = 60.0):
         self.watchlist = watchlist or WATCHLIST
+        self.min_technical_score = float(min_technical_score)
         self.name = "ScannerAgent"
 
     # ── 公開介面 ───────────────────────────────────────
@@ -56,7 +57,7 @@ class ScannerAgent:
         for symbol in self.watchlist:
             try:
                 result = self._analyze(symbol)
-                if result and result.technical_score >= 60:
+                if result and result.technical_score >= self.min_technical_score:
                     results.append(result)
                     logger.info(f"[Scanner] {symbol} 評分={result.technical_score:.1f}")
             except Exception as e:

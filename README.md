@@ -5,8 +5,8 @@
 ## 🎯 主要功能
 
 1. **持股管理** - 透過 LINE Bot 管理個人持股清單
-2. **AI 分析** - Multi-Agent 協作分析技術面、情緒面、風控、回測
-3. **操作建議** - 提供買進/持有/賣出建議及進出場策略
+2. **AI 分析** - Multi-Agent 協作：技術面、籌碼面（價量／法人持股代理）、情緒面、風控、回測
+3. **操作建議** - Advisor 整體評估：買進／持有／賣出、停損／停利參考、短線／波段／長線持有建議與進出場策略
 4. **股價 API** - RESTful API 供第三方軟體查詢股價
 
 ## 架構
@@ -21,7 +21,9 @@ Stock_AI_MultiAgent/
 │   ├── sentiment_agent.py   🧬 情緒分析（Claude API）
 │   ├── risk_agent.py        ⚖️  風控計算（ATR/停損/風報比）
 │   ├── backtest_agent.py    ⚡ 回測驗證（3年歷史勝率）
-│   ├── advisor_agent.py     💡 操作建議（買進/持有/賣出）
+│   ├── chips_agent.py       🧩 籌碼面（量能／季線／法人持股代理）
+│   ├── advisor_agent.py     💡 操作建議（多面向加權、停損停利、持有期間）
+│   ├── portfolio_view.py      📋 持股清單（報價、損益、排序）
 │   ├── line_handler.py      📲 LINE Bot 指令處理
 │   └── line_notifier.py     📨 LINE 訊息推播
 ├── database/
@@ -43,11 +45,12 @@ Stock_AI_MultiAgent/
         ↓
 ORCHESTRATOR（主控）
     ├── ScannerAgent    技術面：RSI、MACD、布林通道、成交量
-    ├── SentimentAgent  情緒面：Claude API 新聞分析
-    ├── RiskAgent       風控：ATR 停損、風報比、流動性
-    └── BacktestAgent   回測：3年歷史勝率、獲利因子
+    ├── SentimentAgent  情緒面：新聞／社群與綜合情緒
+    ├── RiskAgent       風控：ATR、停損、風報比、流動性
+    ├── BacktestAgent   回測：歷史勝率、獲利因子
+    └── ChipsAgent      籌碼面（代理）：量能結構、季線位置、法人持股（yfinance，非證交所即時主力表）
             ↓（並行）
-    AdvisorAgent（操作建議）
+    AdvisorAgent（整體評估：加權評分、停損／停利、短中長線建議）
             ↓
     JSON 報告 + LINE Flex Message 推播
 ```
@@ -107,7 +110,7 @@ https://your-domain.com/webhook
 | 指令 | 說明 | 範例 |
 |------|------|------|
 | `新增持股 <代碼>` | 新增持股到清單 | `新增持股 2330.TW`<br>`新增持股 AAPL` |
-| `查看持股` | 顯示所有持股 | `查看持股` |
+| `查看持股 [排序] [逆序]` | 名稱、持有成本、參考損益、更新日；可排序 | `查看持股`<br>`查看持股 股數 逆序`<br>`查看持股 依獲利` |
 | `刪除持股 <代碼>` | 刪除特定持股 | `刪除持股 2330.TW` |
 | `清空持股` | 移除所有持股 | `清空持股` |
 | `分析持股` | AI 分析並推播建議 | `分析持股` |
@@ -130,8 +133,9 @@ python portfolio_cli.py import --user YOUR_LINE_USER_ID --file portfolio.json --
 # 匯出持股到 CSV
 python portfolio_cli.py export --user YOUR_LINE_USER_ID --file backup.csv --format csv
 
-# 查看持股清單
+# 查看持股清單（含報價參考損益；--sort / --desc）
 python portfolio_cli.py list --user YOUR_LINE_USER_ID
+python portfolio_cli.py list --user YOUR_LINE_USER_ID --sort pnl --desc
 
 # 清空所有持股
 python portfolio_cli.py clear --user YOUR_LINE_USER_ID --confirm
@@ -296,18 +300,21 @@ docker run -d \
 ### Multi-Agent 協作
 
 - **ScannerAgent** - 技術指標分析（RSI、MACD、布林通道、成交量）
-- **SentimentAgent** - 使用 Claude AI 分析市場情緒
+- **SentimentAgent** - 使用 Claude AI 與公開資訊分析市場情緒
 - **RiskAgent** - 計算 ATR 停損、風報比、流動性
 - **BacktestAgent** - 3年歷史數據回測
-- **AdvisorAgent** - 綜合所有數據提供操作建議
+- **ChipsAgent** - 籌碼面代理分數（量能、價格與季線、法人持股比例等公開欄位）
+- **AdvisorAgent** - 技術／籌碼／情緒／風控／回測加權，輸出建議、停損、主要停利與分批停利參考、持有期間（短線／波段／長線）說明
 
 ### 操作建議類型
 
-- 🚀 **強力買進** (STRONG_BUY) - 綜合評分 ≥ 80，各項指標優秀
-- 📈 **買進** (BUY) - 綜合評分 ≥ 70，技術面偏多
-- ✋ **持有** (HOLD) - 綜合評分 55-70，盤整觀望
-- 📉 **賣出** (SELL) - 綜合評分 40-55，技術面轉弱
-- ⚠️ **強力賣出** (STRONG_SELL) - 綜合評分 < 40，多項指標惡化
+- 🚀 **強力買進** (STRONG_BUY) - 綜合分數高且技術、情緒、籌碼偏多
+- 📈 **買進** (BUY) - 綜合評分偏正向
+- ✋ **持有** (HOLD) - 多空因素並存，宜控倉觀察
+- 📉 **賣出** (SELL) - 評分偏低或籌碼／技術轉弱
+- ⚠️ **強力賣出** (STRONG_SELL) - 多面向顯著轉弱
+
+停損／停利價主要依 **RiskAgent** 之波動與風報結構；**AdvisorAgent** 另給分批停利參考價。實際下單請自行判斷。
 
 ## 測試
 

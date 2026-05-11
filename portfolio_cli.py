@@ -7,6 +7,7 @@ import argparse
 import sys
 from pathlib import Path
 from database.portfolio_db import PortfolioDB
+from agents.portfolio_view import SORT_KEYS, format_portfolio_lines
 
 
 def main():
@@ -24,8 +25,10 @@ def main():
   # 匯出持股到 CSV
   python portfolio_cli.py export --user USER123 --file my_portfolio.csv --format csv
   
-  # 查看持股清單
+  # 查看持股清單（含名稱、成本、參考損益、更新日；可排序）
   python portfolio_cli.py list --user USER123
+  python portfolio_cli.py list --user USER123 --sort pnl --desc
+  python portfolio_cli.py list --user USER123 --sort shares --desc
   
   # 清空持股
   python portfolio_cli.py clear --user USER123
@@ -50,6 +53,13 @@ def main():
     # ── list 指令 ────────────────────────────────────
     list_parser = subparsers.add_parser('list', help='查看持股清單')
     list_parser.add_argument('--user', required=True, help='使用者 ID')
+    list_parser.add_argument(
+        '--sort',
+        default='symbol',
+        choices=sorted(SORT_KEYS),
+        help='排序欄位：symbol, name, shares, avg_price, cost, pnl, pnl_pct, updated_at',
+    )
+    list_parser.add_argument('--desc', action='store_true', help='降序（預設為升序）')
     
     # ── clear 指令 ───────────────────────────────────
     clear_parser = subparsers.add_parser('clear', help='清空持股')
@@ -96,26 +106,17 @@ def main():
     
     elif args.command == 'list':
         portfolio = db.get_portfolio(args.user)
-        
+
         if not portfolio:
             print("📭 目前沒有持股")
         else:
-            print(f"📊 持股清單 ({len(portfolio)} 檔):\n")
-            print(f"{'代碼':<12} {'股數':>8} {'成本':>10} {'備註'}")
-            print("-" * 50)
-            
-            for stock in portfolio:
-                symbol = stock['symbol']
-                shares = stock.get('shares', 0)
-                avg_price = stock.get('avg_price', 0)
-                note = stock.get('note', '')
-                
-                print(f"{symbol:<12} {shares:>8.0f} {avg_price:>10.1f} {note}")
-            
-            # 計算總成本
-            total_cost = sum(s.get('shares', 0) * s.get('avg_price', 0) for s in portfolio)
-            print("-" * 50)
-            print(f"{'總成本':<12} {'':>8} {total_cost:>10,.0f}")
+            text = format_portfolio_lines(
+                portfolio,
+                sort_key=args.sort,
+                reverse=args.desc,
+                max_stocks=999,
+            )
+            print(text)
     
     elif args.command == 'clear':
         if not args.confirm:

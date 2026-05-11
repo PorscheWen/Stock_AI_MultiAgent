@@ -5,7 +5,15 @@ import unittest
 from agents.advisor_agent import AdvisorAgent, Recommendation
 
 
-def _make_candidate(symbol="TEST", tech=80, sent=0.75, risk=85, back=70, close=100.0):
+def _make_candidate(
+    symbol="TEST",
+    tech=80,
+    sent=0.75,
+    risk=85,
+    back=70,
+    chips=72,
+    close=100.0,
+):
     """建立測試用候選股票數據"""
     return {
         "symbol": symbol,
@@ -15,14 +23,21 @@ def _make_candidate(symbol="TEST", tech=80, sent=0.75, risk=85, back=70, close=1
             "sentiment": sent * 100,  # 轉換為 0-100 分數
             "risk": risk,
             "backtest": back,
+            "chips": chips,
         },
         "risk": {
+            "level": 2,
             "target_price": close * 1.15,
             "stop_loss_price": close * 0.93,
+            "stop_loss_pct": 7.0,
             "risk_reward_ratio": 2.5,
         },
         "backtest": {
             "win_rate": 0.65,
+        },
+        "aspects": {
+            "backtest": {"win_rate": 0.65},
+            "chips": {"price_vs_ma60_pct": 3.0},
         },
         "signals": ["MACD 金叉", "成交量暴增"],
     }
@@ -55,7 +70,7 @@ class TestAdvisorAgent(unittest.TestCase):
     # ── 持有建議 ───────────────────────────────────────
     def test_hold_recommendation(self):
         """中等分數應該產生持有建議"""
-        c = _make_candidate(tech=60, sent=0.60, risk=60, back=55)
+        c = _make_candidate(tech=60, sent=0.60, risk=60, back=55, chips=52)
         result = self.agent.analyze(c)
         
         self.assertEqual(result.recommendation, Recommendation.HOLD)
@@ -65,7 +80,7 @@ class TestAdvisorAgent(unittest.TestCase):
     # ── 賣出建議 ───────────────────────────────────────
     def test_sell_recommendation(self):
         """低分數應該產生賣出建議"""
-        c = _make_candidate(tech=45, sent=0.40, risk=45, back=40)
+        c = _make_candidate(tech=45, sent=0.40, risk=45, back=40, chips=45)
         result = self.agent.analyze(c)
         
         self.assertEqual(result.recommendation, Recommendation.SELL)
@@ -74,22 +89,30 @@ class TestAdvisorAgent(unittest.TestCase):
     # ── 強力賣出建議 ───────────────────────────────────
     def test_strong_sell_recommendation(self):
         """極低分數應該產生強力賣出建議"""
-        c = _make_candidate(tech=30, sent=0.25, risk=30, back=25)
+        c = _make_candidate(tech=30, sent=0.25, risk=30, back=25, chips=32)
         result = self.agent.analyze(c)
         
         self.assertEqual(result.recommendation, Recommendation.STRONG_SELL)
         self.assertLess(result.confidence, 40)
-        self.assertIn("技術面", result.reason)
+        self.assertIn("技術", result.reason)
 
     # ── 價格計算 ───────────────────────────────────────
     def test_target_and_stop_loss_prices(self):
         """測試目標價和停損價的計算"""
         c = _make_candidate(close=100.0)
         result = self.agent.analyze(c)
-        
+
         self.assertGreater(result.target_price, 100.0)  # 目標價應高於現價
-        self.assertLess(result.stop_loss, 100.0)        # 停損價應低於現價
+        self.assertLess(result.stop_loss, 100.0)  # 停損價應低於現價
         self.assertGreater(result.target_price, result.stop_loss)
+        self.assertGreaterEqual(result.take_profit_price, result.take_profit_partial)
+        self.assertGreater(result.take_profit_partial, 100.0)
+
+    def test_holding_horizon_set(self):
+        c = _make_candidate()
+        result = self.agent.analyze(c)
+        self.assertTrue(result.horizon_label_zh)
+        self.assertTrue(result.horizon_rationale)
 
     # ── 策略內容 ───────────────────────────────────────
     def test_entry_strategy_exists(self):
@@ -107,7 +130,8 @@ class TestAdvisorAgent(unittest.TestCase):
         
         self.assertIsNotNone(result.exit_strategy)
         self.assertGreater(len(result.exit_strategy), 0)
-        self.assertIn("達", result.exit_strategy)  # 應包含目標價描述
+        self.assertIn("停利", result.exit_strategy)
+        self.assertIn("停損", result.exit_strategy)
 
     # ── 理由說明 ───────────────────────────────────────
     def test_reason_provided(self):

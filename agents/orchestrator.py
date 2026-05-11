@@ -21,6 +21,7 @@ from agents.risk_agent       import RiskAgent
 from agents.backtest_agent   import BacktestAgent
 from agents.validation_agent import ValidationAgent
 from agents.advisor_agent    import AdvisorAgent
+from agents.chips_agent      import ChipsAgent
 from agents.line_notifier    import push_report
 from config.settings import (
     ANTHROPIC_AUTH_TOKEN,
@@ -48,6 +49,7 @@ class OrchestratorAgent:
         self.backtest   = BacktestAgent()
         self.validator  = ValidationAgent()
         self.advisor    = AdvisorAgent()
+        self.chips      = ChipsAgent()
         Path(REPORT_DIR).mkdir(exist_ok=True)
 
     # ══════════════════════════════════════════════════
@@ -141,10 +143,51 @@ class OrchestratorAgent:
             results.get("backtest", {}),
         )
 
+    def _run_parallel_with_chips(self, symbols: list[str]) -> tuple[dict, dict, dict, dict]:
+        """持股分析：Sentiment / Risk / Backtest / Chips 並行。"""
+        results: dict = {}
+
+        def run_sentiment():
+            return "sentiment", self.sentiment.run(symbols)
+
+        def run_risk():
+            return "risk", self.risk.run(symbols)
+
+        def run_backtest():
+            return "backtest", self.backtest.run(symbols)
+
+        def run_chips():
+            return "chips", self.chips.run(symbols)
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = [
+                pool.submit(run_sentiment),
+                pool.submit(run_risk),
+                pool.submit(run_backtest),
+                pool.submit(run_chips),
+            ]
+            for future in as_completed(futures):
+                key, data = future.result()
+                results[key] = data
+
+        return (
+            results.get("sentiment", {}),
+            results.get("risk", {}),
+            results.get("backtest", {}),
+            results.get("chips", {}),
+        )
+
     # ══════════════════════════════════════════════════
     # 結果合併
     # ══════════════════════════════════════════════════
-    def _merge(self, scan_results, sentiment_map, risk_map, backtest_map) -> list[dict]:
+    def _merge(
+        self,
+        scan_results,
+        sentiment_map,
+        risk_map,
+        backtest_map,
+        chips_map: dict | None = None,
+    ) -> list[dict]:
         merged = []
         for sr in scan_results:
             sym = sr.symbol
@@ -155,7 +198,7 @@ class OrchestratorAgent:
             if not (sent and risk and bt):
                 continue
 
-            merged.append({
+            row: dict = {
                 "symbol":           sym,
                 "close":            sr.close,
                 # 技術面
@@ -188,8 +231,89 @@ class OrchestratorAgent:
                 "avg_loss":         bt.avg_loss,
                 "profit_factor":    bt.profit_factor,
                 "best_entry_time":  bt.best_entry_time,
-            })
+            }
+
+            if chips_map and sym in chips_map:
+                ch = chips_map[sym]
+                row["chip_score"] = ch.chip_score
+                row["chip_summary"] = ch.summary
+                row["chip_institutional_pct"] = ch.institutional_pct
+                row["chip_volume_ratio_5d_15d"] = ch.volume_ratio_5d_vs_15d
+                row["chip_price_vs_ma60_pct"] = ch.price_vs_ma60_pct
+            else:
+                row["chip_score"] = 50.0
+                row["chip_summary"] = "未啟用籌碼面 Agent。"
+                row["chip_institutional_pct"] = None
+                row["chip_volume_ratio_5d_15d"] = 1.0
+                row["chip_price_vs_ma60_pct"] = 0.0
+
+            merged.append(row)
         return merged
+
+    def _candidate_payload_for_advisor(self, c: dict) -> dict:
+        """將 _merge 扁平結果轉成 AdvisorAgent 需要的結構。"""
+        raw_sent = float(c.get("sentiment_score", 0.5) or 0.5)
+        sent100 = raw_sent * 100.0 if raw_sent <= 1.0 else raw_sent
+
+        scores = {
+            "technical": float(c.get("technical_score", 0) or 0),
+            "sentiment": sent100,
+            "risk": float(c.get("risk_score", 0) or 0),
+            "backtest": float(c.get("backtest_score", 0) or 0),
+            "chips": float(c.get("chip_score", 50) or 50),
+        }
+        risk = {
+            "level": int(c.get("risk_level", 3) or 3),
+            "stop_loss_price": float(c.get("stop_loss_price", 0) or 0),
+            "stop_loss_pct": float(c.get("stop_loss_pct", 0) or 0),
+            "target_price": float(c.get("target_price", 0) or 0),
+            "risk_reward_ratio": float(c.get("risk_reward_ratio", 2.0) or 2.0),
+        }
+        backtest = {
+            "win_rate": float(c.get("win_rate", 0) or 0),
+            "profit_factor": float(c.get("profit_factor", 0) or 0),
+        }
+        aspects = {
+            "technical": {
+                "rsi": c.get("rsi"),
+                "macd": c.get("macd"),
+                "volume_ratio": c.get("volume_ratio"),
+                "signals": c.get("signals", []),
+            },
+            "sentiment": {
+                "summary": c.get("sentiment_summary", ""),
+                "news_score": c.get("news_score"),
+                "social_score": c.get("social_score"),
+                "major_events": c.get("major_events", []),
+            },
+            "risk": {
+                "level": c.get("risk_level"),
+                "atr_pct": c.get("atr_pct"),
+                "liquidity_ok": c.get("liquidity_ok"),
+                "max_drawdown": c.get("max_drawdown"),
+            },
+            "chips": {
+                "score": c.get("chip_score"),
+                "summary": c.get("chip_summary"),
+                "institutional_pct": c.get("chip_institutional_pct"),
+                "volume_ratio_5d_15d": c.get("chip_volume_ratio_5d_15d"),
+                "price_vs_ma60_pct": c.get("chip_price_vs_ma60_pct"),
+            },
+            "backtest": {
+                "win_rate": c.get("win_rate"),
+                "avg_return": c.get("avg_return"),
+                "best_entry_time": c.get("best_entry_time"),
+            },
+        }
+        return {
+            "symbol": c["symbol"],
+            "close": float(c["close"]),
+            "scores": scores,
+            "risk": risk,
+            "backtest": backtest,
+            "signals": c.get("signals", []),
+            "aspects": aspects,
+        }
 
     # ══════════════════════════════════════════════════
     # 報告建立
@@ -319,47 +443,64 @@ class OrchestratorAgent:
             logger.warning("持股清單為空，流程終止")
             return self._empty_report(start_ts)
         
-        # ── STEP 1：掃描技術面（針對指定股票）──────────
+        # ── STEP 1：掃描技術面（持股不設 60 分門檻，避免漏掉弱勢持股）──
         logger.info(f"📡 [STEP 1] Scanner Agent 分析 {len(symbols)} 檔持股...")
-        scanner = ScannerAgent(watchlist=symbols)
+        scanner = ScannerAgent(watchlist=symbols, min_technical_score=0.0)
         scan_results = scanner.run()
-        
+
         if not scan_results:
             logger.warning("掃描無結果，流程終止")
             return self._empty_report(start_ts)
-        
-        # ── STEP 2：並行執行三個 Agent ─────────────────
-        logger.info("⚡ [STEP 2] 並行執行 Sentiment / Risk / Backtest...")
-        sentiment_map, risk_map, backtest_map = self._run_parallel(symbols)
-        
-        # ── STEP 3：合併為候選清單 ─────────────────────
-        candidates = self._merge(scan_results, sentiment_map, risk_map, backtest_map)
+
+        # ── STEP 2：並行 Sentiment / Risk / Backtest / Chips ─
+        logger.info("⚡ [STEP 2] 並行執行 Sentiment / Risk / Backtest / Chips...")
+        sentiment_map, risk_map, backtest_map, chips_map = self._run_parallel_with_chips(symbols)
+
+        # ── STEP 3：合併多面向資料 ─────────────────────
+        candidates = self._merge(
+            scan_results, sentiment_map, risk_map, backtest_map, chips_map
+        )
         logger.info(f"🔀 合併完成，{len(candidates)} 個候選")
-        
-        # ── STEP 4：Advisor 提供操作建議 ───────────────
+
+        # ── STEP 4：Advisor 整體評估（停損／停利／長短線）──
         logger.info("💡 [STEP 4] Advisor Agent 生成操作建議...")
         advised_stocks = []
-        
+
         for candidate in candidates:
             try:
-                advice = self.advisor.analyze(candidate)
-                
+                payload = self._candidate_payload_for_advisor(candidate)
+                advice = self.advisor.analyze(payload)
+
                 advised_stocks.append({
                     "symbol": candidate["symbol"],
                     "name": STOCK_NAMES.get(candidate["symbol"], candidate["symbol"]),
                     "close": candidate["close"],
-                    "recommendation": advice.recommendation.value,
+                    # LINE Flex 使用 Enum.name（STRONG_BUY）
+                    "recommendation": advice.recommendation.name,
                     "confidence": advice.confidence,
                     "reason": advice.reason,
                     "target_price": advice.target_price,
+                    "take_profit_price": advice.take_profit_price,
                     "stop_loss": advice.stop_loss,
+                    "holding_horizon": advice.holding_horizon,
+                    "horizon_label_zh": advice.horizon_label_zh,
+                    "horizon_rationale": advice.horizon_rationale,
                     "entry_strategy": advice.entry_strategy,
                     "exit_strategy": advice.exit_strategy,
                     "scores": {
-                        "technical": round(candidate["technical_score"], 1),
-                        "sentiment": round(candidate["sentiment_score"] * 100, 1),
-                        "risk": round(candidate["risk_score"], 1),
-                        "backtest": round(candidate["backtest_score"], 1),
+                        "technical": round(payload["scores"]["technical"], 1),
+                        "sentiment": round(payload["scores"]["sentiment"], 1),
+                        "risk": round(payload["scores"]["risk"], 1),
+                        "backtest": round(payload["scores"]["backtest"], 1),
+                        "chips": round(payload["scores"]["chips"], 1),
+                    },
+                    "aspects": payload.get("aspects", {}),
+                    "risk": {
+                        "level": candidate.get("risk_level"),
+                        "stop_loss_price": candidate.get("stop_loss_price"),
+                        "stop_loss_pct": candidate.get("stop_loss_pct"),
+                        "target_price": candidate.get("target_price"),
+                        "risk_reward_ratio": candidate.get("risk_reward_ratio"),
                     },
                     "signals": candidate.get("signals", []),
                 })
