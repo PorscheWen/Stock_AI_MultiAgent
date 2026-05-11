@@ -1,0 +1,42 @@
+{
+    "name": "持股操作建議",
+    "short_name": "持股建議",
+    "description": "AI 多代理持股分析與操作建議系統",
+    "start_url": "/app",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#f0f4f8",
+    "theme_color": "#1565c0",
+    "lang": "zh-TW",
+    "icons": [
+        {
+            "src": "/static/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/static/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "查看持股",
+            "url": "/app",
+            "description": "開啟持股清單"
+        },
+        {
+            "name": "截圖辨識",
+            "url": "/app#screenshot",
+            "description": "上傳截圖更新持股"
+        }
+    ],
+    "categories": [
+        "finance",
+        "productivity"
+    ]
+}

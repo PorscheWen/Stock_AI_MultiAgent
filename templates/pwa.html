@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>持股操作建議</title>
+    <meta name="theme-color" content="#1565c0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="持股建議">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <style>
+        /* ── Reset & Variables ─────────────────────────────── */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent
+        }
+
+        :root {
+            --primary: #1565c0;
+            --primary-dk: #0d47a1;
+            --primary-lt: #e3f2fd;
+            --up: #e53935;
+            --down: #43a047;
+            --hold: #fb8c00;
+            --bg: #f0f4f8;
+            --surface: #fff;
+            --border: #e0e0e0;
+            --text: #1a1a2e;
+            --muted: #666;
+            --radius: 14px;
+            --shadow: 0 2px 12px rgba(0, 0, 0, .10);
+            --nav-h: 60px;
+            --hdr-h: 56px;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+            background: var(--bg);
+            color: var(--text)
+        }
+
+        /* ── Layout ────────────────────────────────────────── */
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100dvh
+        }
+
+        #header {
+            height: var(--hdr-h);
+            background: var(--primary);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 10px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+            flex-shrink: 0;
+            z-index: 10
+        }
+
+        #header h1 {
+            font-size: 17px;
+            font-weight: 700;
+            flex: 1
+        }
+
+        #header .uid-badge {
+            font-size: 11px;
+            opacity: .75;
+            background: rgba(255, 255, 255, .15);
+            padding: 3px 8px;
+            border-radius: 20px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100px
+        }
+
+        #main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px
+        }
+
+        #bottom-nav {
+            height: var(--nav-h);
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-shrink: 0;
+            z-index: 10
+        }
+
+        .nav-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            border: none;
+            background: none;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color .15s
+        }
+
+        .nav-btn.active {
+            color: var(--primary)
+        }
+
+        .nav-btn svg {
+            width: 22px;
+            height: 22px
+        }
+
+        /* ── Views ─────────────────────────────────────────── */
+        .view {
+            display: none
+        }
+
+        .view.active {
+            display: block
+        }
+
+        /* ── Cards ─────────────────────────────────────────── */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 14px 16px;
+            margin-bottom: 10px
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 10px
+        }
+
+        /* ── Stock Item ─────────────────────────────────────── */
+        .stock-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            gap: 10px
+        }
+
+        .stock-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0
+        }
+
+        .stock-sym {
+            font-size: 15px;
+            font-weight: 700;
+            min-width: 75px
+        }
+
+        .stock-name {
+            font-size: 12px;
+            color: var(--muted);
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+        .stock-price-col {
+            text-align: right
+        }
+
+        .stock-price {
+            font-size: 16px;
+            font-weight: 700
+        }
+
+        .stock-chg {
+            font-size: 11px;
+            font-weight: 600
+        }
+
+        .up {
+            color: var(--up)
+        }
+
+        .down {
+            color: var(--down)
+        }
+
+        .neutral {
+            color: var(--muted)
+        }
+
+        .stock-meta {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 1px
+        }
+
+        .btn-ghost {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 8px;
+            color: var(--muted);
+            line-height: 0
+        }
+
+        .btn-ghost:active {
+            background: var(--bg)
+        }
+
+        /* ── Buttons ────────────────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 18px;
+            border-radius: 10px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity .15s
+        }
+
+        .btn:active {
+            opacity: .75
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff
+        }
+
+        .btn-success {
+            background: #2e7d32;
+            color: #fff
+        }
+
+        .btn-danger {
+            background: #c62828;
+            color: #fff
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid var(--primary);
+            color: var(--primary)
+        }
+
+        .btn-block {
+            width: 100%;
+            margin-top: 10px
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px
+        }
+
+        /* ── Input ──────────────────────────────────────────── */
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px
+        }
+
+        .input-group input,
+        .form-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            background: var(--surface);
+            color: var(--text);
+            outline: none;
+            -webkit-appearance: none
+        }
+
+        .input-group input:focus,
+        .form-input:focus {
+            border-color: var(--primary)
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px
+        }
+
+        .form-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px
+        }
+
+        /* ── FAB ────────────────────────────────────────────── */
+        #fab {
+            position: fixed;
+            bottom: calc(var(--nav-h)+16px);
+            right: 16px;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            font-size: 26px;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(21, 101, 192, .45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            line-height: 1
+        }
+
+        #fab:active {
+            transform: scale(.93)
+        }
+
+        /* ── Modal ──────────────────────────────────────────── */
+        #modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .45);
+            z-index: 30;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s
+        }
+
+        #modal-overlay.open {
+            opacity: 1;
+            pointer-events: all
+        }
+
+        #modal {
+            background: var(--surface);
+            border-radius: 20px 20px 0 0;
+            width: 100%;
+            max-width: 520px;
+            padding: 20px;
+            transform: translateY(40px);
+            transition: transform .2s
+        }
+
+        #modal-overlay.open #modal {
+            transform: translateY(0)
+        }
+
+        #modal h2 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px
+        }
+
+        /* ── Badge ──────────────────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .3px
+        }
+
+        .badge-strong-buy {
+            background: #b71c1c;
+            color: #fff
+        }
+
+        .badge-buy {
+            background: #e53935;
+            color: #fff
+        }
+
+        .badge-hold {
+            background: #ef6c00;
+            color: #fff
+        }
+
+        .badge-sell {
+            background: #2e7d32;
+            color: #fff
+        }
+
+        .badge-strong-sell {
+            background: #1b5e20;
+            color: #fff
+        }
+
+        /* ── Analysis Result ────────────────────────────────── */
+        .result-card {
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            border-radius: 12px;
+            background: var(--surface);
+            box-shadow: var(--shadow)
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px
+        }
+
+        .result-sym {
+            font-size: 15px;
+            font-weight: 700
+        }
+
+        .result-conf {
+            font-size: 11px;
+            color: var(--muted)
+        }
+
+        .result-reason {
+            font-size: 12px;
+            color: var(--text);
+            line-height: 1.5;
+            margin-bottom: 6px
+        }
+
+        .result-prices {
+            display: flex;
+            gap: 12px;
+            font-size: 11px
+        }
+
+        .result-prices span {
+            color: var(--muted)
+        }
+
+        .result-prices b {
+            color: var(--text)
+        }
+
+        /* ── Screenshot ─────────────────────────────────────── */
+        #upload-area {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 32px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s
+        }
+
+        #upload-area:active,
+        #upload-area.drag-over {
+            border-color: var(--primary);
+            background: var(--primary-lt)
+        }
+
+        #upload-area svg {
+            width: 48px;
+            height: 48px;
+            color: var(--muted);
+            margin-bottom: 10px
+        }
+
+        #upload-area p {
+            color: var(--muted);
+            font-size: 14px
+        }
+
+        #preview-img {
+            width: 100%;
+            border-radius: 10px;
+            margin: 10px 0;
+            max-height: 280px;
+            object-fit: contain;
+            display: none
+        }
+
+        #detected-stocks {
+            margin-top: 4px
+        }
+
+        /* ── Price Search ───────────────────────────────────── */
+        .price-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px
+        }
+
+        .price-detail-item {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 8px 12px
+        }
+
+        .price-detail-label {
+            font-size: 11px;
+            color: var(--muted)
+        }
+
+        .price-detail-val {
+            font-size: 15px;
+            font-weight: 600
+        }
+
+        /* ── Loading ────────────────────────────────────────── */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, .3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .7s linear infinite
+        }
+
+        .page-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            margin: 60px auto
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        /* ── Toast ──────────────────────────────────────────── */
+        #toast-container {
+            position: fixed;
+            top: calc(var(--hdr-h)+8px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+            width: calc(100% - 32px);
+            max-width: 400px
+        }
+
+        .toast {
+            background: #323232;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+            animation: toast-in .2s ease;
+            opacity: 0;
+            transition: opacity .3s
+        }
+
+        .toast.show {
+            opacity: 1
+        }
+
+        .toast.success {
+            background: #2e7d32
+        }
+
+        .toast.error {
+            background: #c62828
+        }
+
+        @keyframes toast-in {
+            from {
+                transform: translateY(-10px)
+            }
+
+            to {
+                transform: translateY(0)
+            }
+        }
+
+        /* ── Empty State ────────────────────────────────────── */
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted)
+        }
+
+        .empty svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 14px;
+            opacity: .35
+        }
+
+        .empty p {
+            font-size: 15px;
+            margin-bottom: 6px
+        }
+
+        .empty small {
+            font-size: 13px
+        }
+
+        /* ── Section Divider ─────────────────────────────────── */
+        .section-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 2px;
+            margin: 12px 0 6px
+        }
+
+        .section-hdr h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        /* ── Install Banner ─────────────────────────────────── */
+        #install-banner {
+            background: var(--primary);
+            color: #fff;
+            padding: 10px 14px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0
+        }
+
+        #install-banner p {
+            flex: 1;
+            font-size: 13px
+        }
+
+        #install-banner button {
+            background: rgba(255, 255, 255, .2);
+            border: none;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app">
+        <!-- Install Banner -->
+        <div id="install-banner">
+            <p>📲 將此 App 加到主畫面</p>
+            <button id="btn-install">安裝</button>
+            <button id="btn-install-close"
+                style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px 8px">✕</button>
+        </div>
+
+        <!-- Header -->
+        <header id="header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                <polyline points="16 7 22 7 22 13" />
+            </svg>
+            <h1>持股操作建議</h1>
+            <span class="uid-badge" id="uid-badge">未初始化</span>
+        </header>
+
+        <!-- Main Content -->
+        <main id="main">
+
+            <!-- ══ 持股 View ══════════════════════════════════ -->
+            <div id="view-portfolio" class="view active">
+                <div class="section-hdr">
+                    <h3>我的持股</h3>
+                    <button class="btn btn-outline btn-sm" id="btn-refresh">⟳ 更新股價</button>
+                </div>
+                <div id="portfolio-list"></div>
+            </div>
+
+            <!-- ══ 股價 View ══════════════════════════════════ -->
+            <div id="view-price" class="view">
+                <div class="section-hdr">
+                    <h3>即時股價查詢</h3>
+                </div>
+                <div class="card">
+                    <div class="input-group">
+                        <input id="price-input" type="text" placeholder="輸入代碼，例：2330.TW 或 AAPL" autocomplete="off"
+                            autocapitalize="characters">
+                        <button class="btn btn-primary" id="btn-search">查詢</button>
+                    </div>
+                </div>
+                <div id="price-result"></div>
+            </div>
+
+            <!-- ══ 截圖 View ══════════════════════════════════ -->
+            <div id="view-screenshot" class="view">
+                <div class="section-hdr">
+                    <h3>截圖辨識持股</h3>
+                </div>
+                <div class="card">
+                    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">上傳券商 App 持倉截圖（台股/美股），AI 自動辨識並更新持股
+                    </p>
+                    <label id="upload-area" for="img-input">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <p>點擊選擇圖片或直接上傳截圖</p>
+                        <small style="font-size:12px;color:#aaa;margin-top:4px;display:block">支援 JPG / PNG /
+                            WEBP</small>
+                    </label>
+                    <input type="file" id="img-input" accept="image/*" style="display:none" capture="environment">
+                    <img id="preview-img" alt="預覽">
+                    <div id="ocr-status"></div>
+                </div>
+                <div id="detected-stocks"></div>
+            </div>
+
+            <!-- ══ 分析 View ══════════════════════════════════ -->
+            <div id="view-analysis" class="view">
+                <div class="section-hdr">
+                    <h3>AI 持股分析</h3>
+                </div>
+                <div class="card">
+                    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">多代理協作分析技術面、情緒面、風控與回測，提供操作建議</p>
+                    <button class="btn btn-primary btn-block" id="btn-analyze">
+                        🤖 開始 AI 分析
+                    </button>
+                </div>
+                <div id="analysis-result"></div>
+            </div>
+
+        </main>
+
+        <!-- FAB (持股頁用) -->
+        <button id="fab" title="新增持股">＋</button>
+
+        <!-- Bottom Nav -->
+        <nav id="bottom-nav">
+            <button class="nav-btn active" data-view="portfolio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="18" rx="2" />
+                    <line x1="8" y1="10" x2="8" y2="17" />
+                    <line x1="12" y1="7" x2="12" y2="17" />
+                    <line x1="16" y1="13" x2="16" y2="17" />
+                </svg>
+                持股
+            </button>
+            <button class="nav-btn" data-view="price">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                股價
+            </button>
+            <button class="nav-btn" data-view="screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                </svg>
+                截圖
+            </button>
+            <button class="nav-btn" data-view="analysis">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                分析
+            </button>
+        </nav>
+    </div>
+
+    <!-- Add Stock Modal -->
+    <div id="modal-overlay">
+        <div id="modal">
+            <h2>新增持股</h2>
+            <div class="form-label">股票代碼 *</div>
+            <input class="form-input" id="add-symbol" placeholder="例：2330.TW 或 AAPL" autocapitalize="characters"
+                style="margin-bottom:10px">
+            <div class="form-row">
+                <div>
+                    <div class="form-label">持股數量</div>
+                    <input class="form-input" id="add-shares" type="number" min="0" placeholder="0" inputmode="decimal">
+                </div>
+                <div>
+                    <div class="form-label">平均成本</div>
+                    <input class="form-input" id="add-avgprice" type="number" min="0" placeholder="0.00"
+                        inputmode="decimal">
+                </div>
+            </div>
+            <div class="form-label" style="margin-top:4px">備註（選填）</div>
+            <input class="form-input" id="add-note" placeholder="自訂備註" style="margin-top:4px">
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="btn-modal-cancel" style="flex:1">取消</button>
+                <button class="btn btn-primary" id="btn-modal-save" style="flex:2">確認新增</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════
+        // 1. Utilities
+        // ═══════════════════════════════════════════════════════
+        function genUserId() {
+            return 'pwa_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+        }
+
+        function getUserId() {
+            let id = localStorage.getItem('stock_user_id');
+            if (!id) { id = genUserId(); localStorage.setItem('stock_user_id', id); }
+            return id;
+        }
+
+        const USER_ID = getUserId();
+
+        function apiHeaders() {
+            return { 'Content-Type': 'application/json', 'X-User-ID': USER_ID };
+        }
+
+        function apiHeadersForm() {
+            return { 'X-User-ID': USER_ID };
+        }
+
+        async function apiFetch(url, opts = {}) {
+            const r = await fetch(url, opts);
+            if (!r.ok) {
+                const e = await r.json().catch(() => ({ error: r.statusText }));
+                throw new Error(e.error || r.statusText);
+            }
+            return r.json();
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 2. Toast
+        // ═══════════════════════════════════════════════════════
+        function showToast(msg, type = '') {
+            const ct = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = 'toast ' + type;
+            el.textContent = msg;
+            ct.appendChild(el);
+            requestAnimationFrame(() => el.classList.add('show'));
+            setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 3. Navigation
+        // ═══════════════════════════════════════════════════════
+        const FAB = document.getElementById('fab');
+        function navigate(view) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-' + view).classList.add('active');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`[data-view="${view}"]`).classList.add('active');
+            FAB.style.display = view === 'portfolio' ? 'flex' : 'none';
+        }
+
+        document.querySelectorAll('.nav-btn').forEach(btn =>
+            btn.addEventListener('click', () => navigate(btn.dataset.view))
+        );
+
+        // ═══════════════════════════════════════════════════════
+        // 4. Portfolio View
+        // ═══════════════════════════════════════════════════════
+        let portfolioData = [];
+
+        function priceCls(v) { return v > 0 ? 'up' : v < 0 ? 'down' : 'neutral'; }
+        function fmtPct(v) { return (v > 0 ? '+' : '') + v.toFixed(2) + '%'; }
+        function fmtPrice(v) { return v ? Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; }
+
+        function renderPortfolio(stocks) {
+            portfolioData = stocks;
+            const el = document.getElementById('portfolio-list');
+            if (!stocks.length) {
+                el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="10" x2="8" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/><line x1="16" y1="13" x2="16" y2="17"/></svg>
+      <p>尚無持股</p><small>點擊右下角 ＋ 新增，或到「截圖」頁上傳截圖</small>
+    </div>`;
+                return;
+            }
+            el.innerHTML = stocks.map(s => {
+                const p = s.current_price || 0;
+                const pct = s.change_pct || 0;
+                const chg = s.change || 0;
+                const cls = priceCls(pct);
+                const avgP = s.avg_price || 0;
+                const shares = s.shares || 0;
+                const pnl = avgP && p ? ((p - avgP) / avgP * 100) : null;
+                const meta = [
+                    shares ? `持 ${Number(shares).toLocaleString()} 股` : '',
+                    avgP ? `均 ${fmtPrice(avgP)}` : '',
+                    pnl !== null ? `(${pnl >= 0 ? '+' : ''}${pnl.toFixed(1)}%)` : '',
+                ].filter(Boolean).join('　');
+                return `<div class="card" style="padding:10px 14px">
+      <div class="stock-item" style="padding:0;border:none">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="stock-sym">${s.symbol}</span>
+            ${s.name ? `<span class="stock-name">${s.name}</span>` : ''}
+          </div>
+          ${meta ? `<div class="stock-meta" style="margin-top:3px">${meta}</div>` : ''}
+        </div>
+        <div class="stock-price-col">
+          <div class="stock-price ${p ? cls : 'neutral'}">${p ? fmtPrice(p) : '—'}</div>
+          ${p ? `<div class="stock-chg ${cls}">${fmtPct(pct)}　${chg >= 0 ? '+' : ''}${fmtPrice(chg)}</div>` : ''}
+        </div>
+        <button class="btn-ghost" onclick="confirmRemove('${s.symbol}')" title="刪除">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
+    </div>`;
+            }).join('');
+        }
+
+        function confirmRemove(symbol) {
+            if (!confirm(`確定刪除持股 ${symbol}？`)) return;
+            apiFetch(`/api/portfolio/${encodeURIComponent(symbol)}`, {
+                method: 'DELETE', headers: apiHeaders()
+            }).then(() => {
+                showToast(`已刪除 ${symbol}`, 'success');
+                loadPortfolio();
+            }).catch(e => showToast('刪除失敗：' + e.message, 'error'));
+        }
+
+        async function loadPortfolio(withPrices = true) {
+            const el = document.getElementById('portfolio-list');
+            el.innerHTML = '<div class="page-spinner"></div>';
+            try {
+                const url = withPrices ? '/api/portfolio/prices' : '/api/portfolio';
+                const data = await apiFetch(url, { headers: apiHeadersForm() });
+                renderPortfolio(data.stocks || []);
+            } catch (e) {
+                el.innerHTML = `<div class="empty"><p>載入失敗</p><small>${e.message}</small></div>`;
+            }
+        }
+
+        document.getElementById('btn-refresh').addEventListener('click', () => loadPortfolio(true));
+
+        // ── Add Stock Modal ──────────────────────────────────
+        const overlay = document.getElementById('modal-overlay');
+        function openModal() { overlay.classList.add('open'); document.getElementById('add-symbol').focus(); }
+        function closeModal() { overlay.classList.remove('open');['add-symbol', 'add-shares', 'add-avgprice', 'add-note'].forEach(id => document.getElementById(id).value = ''); }
+
+        FAB.addEventListener('click', openModal);
+        document.getElementById('btn-modal-cancel').addEventListener('click', closeModal);
+        overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+        document.getElementById('btn-modal-save').addEventListener('click', async () => {
+            const symbol = document.getElementById('add-symbol').value.trim().toUpperCase();
+            if (!symbol) { showToast('請輸入股票代碼', 'error'); return; }
+            const shares = parseFloat(document.getElementById('add-shares').value) || 0;
+            const avg_price = parseFloat(document.getElementById('add-avgprice').value) || 0;
+            const note = document.getElementById('add-note').value.trim();
+            const btn = document.getElementById('btn-modal-save');
+            btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+            try {
+                await apiFetch('/api/portfolio', {
+                    method: 'POST', headers: apiHeaders(),
+                    body: JSON.stringify({ symbol, shares, avg_price, note })
+                });
+                showToast(`已新增 ${symbol}`, 'success');
+                closeModal();
+                loadPortfolio();
+            } catch (e) {
+                showToast('新增失敗：' + e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = '確認新增';
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // 5. Stock Price View
+        // ═══════════════════════════════════════════════════════
+        async function searchPrice() {
+            const sym = document.getElementById('price-input').value.trim().toUpperCase();
+            if (!sym) return;
+            const el = document.getElementById('price-result');
+            el.innerHTML = '<div class="page-spinner"></div>';
+            try {
+                const d = await apiFetch(`/api/v1/stock/${encodeURIComponent(sym)}`);
+                const pct = d.change_pct || 0;
+                const cls = priceCls(pct);
+                el.innerHTML = `<div class="card">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+        <span style="font-size:18px;font-weight:800">${d.symbol}</span>
+        <span style="font-size:13px;color:var(--muted);flex:1">${d.name || ''}</span>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+        <span style="font-size:28px;font-weight:700;color:var(--text)">${fmtPrice(d.price)}</span>
+        <span class="stock-chg ${cls}" style="font-size:15px">${fmtPct(pct)}　${d.change >= 0 ? '+' : ''}${fmtPrice(d.change)}</span>
+      </div>
+      <div class="price-detail-grid">
+        <div class="price-detail-item"><div class="price-detail-label">開盤</div><div class="price-detail-val">${fmtPrice(d.open)}</div></div>
+        <div class="price-detail-item"><div class="price-detail-label">最高</div><div class="price-detail-val up">${fmtPrice(d.high)}</div></div>
+        <div class="price-detail-item"><div class="price-detail-label">最低</div><div class="price-detail-val down">${fmtPrice(d.low)}</div></div>
+        <div class="price-detail-item"><div class="price-detail-label">昨收</div><div class="price-detail-val">${fmtPrice(d.close)}</div></div>
+      </div>
+      <button class="btn btn-outline btn-block btn-sm" onclick="addFromPrice('${d.symbol}')">＋ 加入持股</button>
+    </div>`;
+            } catch (e) {
+                el.innerHTML = `<div class="card"><p style="color:var(--up);text-align:center">${e.message}</p></div>`;
+            }
+        }
+
+        async function addFromPrice(symbol) {
+            try {
+                await apiFetch('/api/portfolio', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ symbol }) });
+                showToast(`已加入持股 ${symbol}`, 'success');
+            } catch (e) { showToast('新增失敗：' + e.message, 'error'); }
+        }
+
+        document.getElementById('btn-search').addEventListener('click', searchPrice);
+        document.getElementById('price-input').addEventListener('keydown', e => { if (e.key === 'Enter') searchPrice(); });
+
+        // ═══════════════════════════════════════════════════════
+        // 6. Screenshot View
+        // ═══════════════════════════════════════════════════════
+        let detectedStocks = [];
+
+        document.getElementById('img-input').addEventListener('change', async function () {
+            const file = this.files[0];
+            if (!file) return;
+
+            // Show preview
+            const preview = document.getElementById('preview-img');
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+
+            // Reset state
+            detectedStocks = [];
+            document.getElementById('detected-stocks').innerHTML = '';
+            const status = document.getElementById('ocr-status');
+            status.innerHTML = '<div style="text-align:center;padding:12px"><div class="spinner" style="border-color:rgba(21,101,192,.2);border-top-color:var(--primary);width:28px;height:28px;margin:0 auto 6px"></div><p style="font-size:13px;color:var(--muted)">AI 辨識截圖中…</p></div>';
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const result = await apiFetch('/api/screenshot', {
+                    method: 'POST',
+                    headers: { 'X-User-ID': USER_ID },
+                    body: formData
+                });
+                status.innerHTML = '';
+                if (!result.stocks || result.stocks.length === 0) {
+                    status.innerHTML = `<div class="card" style="background:var(--bg)">
+        <p style="color:var(--up);font-size:14px">⚠️ 無法辨識持倉</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px">${result.note || '請上傳券商 App 持倉頁面截圖'}</p>
+      </div>`;
+                    return;
+                }
+                detectedStocks = result.stocks;
+                renderDetectedStocks(result.stocks, result.confidence);
+            } catch (e) {
+                status.innerHTML = `<div class="card"><p style="color:var(--up);font-size:14px">辨識失敗：${e.message}</p></div>`;
+            }
+        });
+
+        function renderDetectedStocks(stocks, confidence) {
+            const pct = Math.round((confidence || 0) * 100);
+            const el = document.getElementById('detected-stocks');
+            el.innerHTML = `<div class="card">
+    <div class="card-title">辨識結果（信心度 ${pct}%）</div>
+    ${stocks.map((s, i) => `
+      <div class="stock-item" style="${i === 0 ? 'padding-top:0' : ''}">
+        <div style="flex:1">
+          <div class="stock-sym">${s.symbol}</div>
+          ${s.name ? `<div style="font-size:12px;color:var(--muted)">${s.name}</div>` : ''}
+        </div>
+        <div style="text-align:right;font-size:12px;color:var(--muted)">
+          ${s.shares ? `<div>${Number(s.shares).toLocaleString()} 股</div>` : ''}
+          ${s.avg_price ? `<div>均 ${fmtPrice(s.avg_price)}</div>` : ''}
+        </div>
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-outline" id="btn-ocr-cancel" style="flex:1">重拍</button>
+      <button class="btn btn-success" id="btn-ocr-confirm" style="flex:2">✅ 確認匯入</button>
+    </div>
+  </div>`;
+
+            document.getElementById('btn-ocr-cancel').addEventListener('click', () => {
+                document.getElementById('preview-img').style.display = 'none';
+                document.getElementById('detected-stocks').innerHTML = '';
+                document.getElementById('ocr-status').innerHTML = '';
+                document.getElementById('img-input').value = '';
+                detectedStocks = [];
+            });
+
+            document.getElementById('btn-ocr-confirm').addEventListener('click', importDetectedStocks);
+        }
+
+        async function importDetectedStocks() {
+            if (!detectedStocks.length) return;
+            const btn = document.getElementById('btn-ocr-confirm');
+            btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 匯入中…';
+            try {
+                const result = await apiFetch('/api/screenshot/import', {
+                    method: 'POST', headers: apiHeaders(),
+                    body: JSON.stringify({ stocks: detectedStocks })
+                });
+                const count = result.success || 0;
+                showToast(`已匯入 ${count} 檔持股 ✅`, 'success');
+                // Reset screenshot view
+                document.getElementById('preview-img').style.display = 'none';
+                document.getElementById('detected-stocks').innerHTML = '';
+                document.getElementById('ocr-status').innerHTML = '';
+                document.getElementById('img-input').value = '';
+                detectedStocks = [];
+                // Reload portfolio
+                if (count > 0) loadPortfolio();
+            } catch (e) {
+                showToast('匯入失敗：' + e.message, 'error');
+                btn.disabled = false; btn.textContent = '✅ 確認匯入';
+            }
+        }
+
+        // drag-over styling
+        const uploadArea = document.getElementById('upload-area');
+        uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault(); uploadArea.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) { const dt = new DataTransfer(); dt.items.add(file); document.getElementById('img-input').files = dt.files; document.getElementById('img-input').dispatchEvent(new Event('change')); }
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // 7. Analysis View
+        // ═══════════════════════════════════════════════════════
+        let analysisJobId = null;
+        let analysisTimer = null;
+
+        const BADGE_MAP = {
+            STRONG_BUY: ['strong-buy', '強力買進'],
+            BUY: ['buy', '買進'],
+            HOLD: ['hold', '持有觀察'],
+            SELL: ['sell', '賣出'],
+            STRONG_SELL: ['strong-sell', '強力賣出'],
+        };
+
+        function renderAnalysisResult(report) {
+            const results = report.results || [];
+            if (!results.length) {
+                document.getElementById('analysis-result').innerHTML = '<div class="card"><p>無分析結果</p></div>';
+                return;
+            }
+            const summary = report.summary || {};
+            const summaryHtml = Object.entries(BADGE_MAP)
+                .map(([k, [cls, label]]) => summary[k.toLowerCase()] ? `<span class="badge badge-${cls}">${label} ${summary[k.toLowerCase()]}</span>` : '')
+                .filter(Boolean).join(' ');
+
+            const cards = results.map(r => {
+                const key = (r.recommendation || 'HOLD').toUpperCase().replace(' ', '_');
+                const [cls, label] = BADGE_MAP[key] || ['hold', r.recommendation];
+                const tp = r.target_price ? `目標 <b>${fmtPrice(r.target_price)}</b>` : '';
+                const sl = r.stop_loss ? `止損 <b>${fmtPrice(r.stop_loss)}</b>` : '';
+                return `<div class="result-card">
+      <div class="result-header">
+        <span class="result-sym">${r.symbol}</span>
+        <span class="badge badge-${cls}">${label}</span>
+        <span class="result-conf" style="margin-left:auto">${Math.round((r.confidence || 0) * 100)}%</span>
+      </div>
+      ${r.reason ? `<div class="result-reason">${r.reason}</div>` : ''}
+      ${tp || sl ? `<div class="result-prices">${tp ? `<span>${tp}</span>` : ''}${sl ? `<span>${sl}</span>` : ''}</div>` : ''}
+      ${r.entry_strategy ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">進場：${r.entry_strategy}</div>` : ''}
+    </div>`;
+            }).join('');
+
+            document.getElementById('analysis-result').innerHTML = `
+    <div class="card" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      ${summaryHtml || '<span style="font-size:13px;color:var(--muted)">分析完成</span>'}
+    </div>
+    ${cards}`;
+        }
+
+        async function pollAnalysis() {
+            if (!analysisJobId) return;
+            try {
+                const job = await apiFetch(`/api/analysis/${analysisJobId}`);
+                if (job.status === 'done') {
+                    clearInterval(analysisTimer);
+                    const btn = document.getElementById('btn-analyze');
+                    btn.disabled = false; btn.textContent = '🤖 重新分析';
+                    renderAnalysisResult(job.result || {});
+                    showToast('AI 分析完成 ✅', 'success');
+                } else if (job.status === 'error') {
+                    clearInterval(analysisTimer);
+                    const btn = document.getElementById('btn-analyze');
+                    btn.disabled = false; btn.textContent = '🤖 開始 AI 分析';
+                    document.getElementById('analysis-result').innerHTML = `<div class="card"><p style="color:var(--up)">分析失敗：${job.error}</p></div>`;
+                }
+            } catch (e) { /* ignore poll errors */ }
+        }
+
+        document.getElementById('btn-analyze').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-analyze');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> 分析中…';
+            document.getElementById('analysis-result').innerHTML = '<div class="card"><div class="page-spinner"></div><p style="text-align:center;font-size:13px;color:var(--muted);padding-bottom:12px">多代理協作分析中，約需 1-2 分鐘…</p></div>';
+            clearInterval(analysisTimer);
+            try {
+                const job = await apiFetch('/api/analysis', { method: 'POST', headers: apiHeaders() });
+                analysisJobId = job.job_id;
+                analysisTimer = setInterval(pollAnalysis, 4000);
+            } catch (e) {
+                btn.disabled = false; btn.textContent = '🤖 開始 AI 分析';
+                showToast('錯誤：' + e.message, 'error');
+                document.getElementById('analysis-result').innerHTML = '';
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // 8. PWA Install
+        // ═══════════════════════════════════════════════════════
+        let deferredInstall = null;
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            deferredInstall = e;
+            document.getElementById('install-banner').style.display = 'flex';
+        });
+        document.getElementById('btn-install').addEventListener('click', async () => {
+            if (!deferredInstall) return;
+            deferredInstall.prompt();
+            const { outcome } = await deferredInstall.userChoice;
+            if (outcome === 'accepted') document.getElementById('install-banner').style.display = 'none';
+            deferredInstall = null;
+        });
+        document.getElementById('btn-install-close').addEventListener('click', () => {
+            document.getElementById('install-banner').style.display = 'none';
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // 9. Service Worker Registration
+        // ═══════════════════════════════════════════════════════
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => { });
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 10. Init
+        // ═══════════════════════════════════════════════════════
+        document.getElementById('uid-badge').textContent = USER_ID.slice(-8);
+        loadPortfolio();
+    </script>
+</body>
+
+</html>
